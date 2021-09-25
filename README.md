@@ -1,0 +1,2 @@
+# Tweet Downloader
+This is a Python script project that allows you to download a Tweet video from [Twitter](https://www.twitter.com) and being saved on a specified folder (by default, the tweet ID). It accepts URLs like ``https://twitter.com/firefox/status/1399712574812286986`` and returns a ``list`` of ``dict`` containing an ``urls`` key.
