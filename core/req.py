@@ -17,13 +17,6 @@ def _default_request(url: str, method: str, data: dict = None, headers: dict = N
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:90.0) Gecko/20100101 Firefox/90.0"}
 
-        for k, v in headers.items():
-            del headers[k]
-            new_key = ""
-            for word in k.split("-"):
-                new_key += word[0].upper() + word[1:] + "-"
-            headers[new_key[0:-1]] = v
-
         response = http.request(method.upper(), url,
                                 fields=query, headers=headers, body=data)
 

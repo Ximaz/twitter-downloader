@@ -27,18 +27,19 @@ def get_video_as_json(video_id: str, graphql_query: str, bearer_token: str, gues
                             "withCommunity": False, "withTweetQuoteCount": False, "withBirdwatchNotes": False,
                             "withBirdwatchPivots": False, "withTweetResult": False, "withReactions": False,
                             "withSuperFollowsTweetFields": False, "withSuperFollowsUserFields": False, "withUserResults": False,
-                            "withVoice": False, "withReactionsMetadata": False, "withReactionsPerspective": False}).replace(' ', '')
+                            "withVoice": False, "withReactionsMetadata": False, "withNftAvatar": False, "withReactionsPerspective": False}).replace(' ', '')
 
     url = "https://twitter.com/i/api/graphql/" + graphql_query + \
         "/TweetDetail?variables=" + urllib.parse.quote(variables)
 
     response = Request.get(url, headers={
         "Authorization": "Bearer " + bearer_token,
-        "X-Guest-Token": guest_token
+        "X-Guest-Token": guest_token,
     })
 
     content = response.content.decode("utf-8")
     data = json.loads(content)
+    print(data)
     item = data["data"]["threaded_conversation_with_injections"]["instructions"][0]["entries"][0]["content"][
         "itemContent"]
 
@@ -49,8 +50,8 @@ def get_video_as_json(video_id: str, graphql_query: str, bearer_token: str, gues
     return legacy["extended_entities"]["media"] if "extended_entities" in legacy.keys() else None
 
 
-def get_video_sources(video_url: str) -> list:
-    video_id = video_url.split("/").pop().split("?")[0]
+def get_video_sources(username: str, video_id: str) -> list:
+    video_url = "https://twitter.com/"+username+"/status/"+video_id
 
     # Initializing tokens to use the API as a guest.
     # Getting GraphQL Hash ID to perform 'TwitterDetails' request.
