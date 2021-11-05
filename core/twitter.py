@@ -39,7 +39,6 @@ def get_video_as_json(video_id: str, graphql_query: str, bearer_token: str, gues
 
     content = response.content.decode("utf-8")
     data = json.loads(content)
-    print(data)
     item = data["data"]["threaded_conversation_with_injections"]["instructions"][0]["entries"][0]["content"][
         "itemContent"]
 
