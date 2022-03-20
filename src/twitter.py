@@ -62,6 +62,10 @@ def get_video_as_json(video_id: str, guest_account: GuestAccount) -> dict:
 
     content = response.content.decode("utf-8")
     data = json.loads(content)
+    if "data" not in data:
+        raise "This repo needs to be updated. Please, open an issue at https://github.com/Ximaz/twitter-downloader and past the following error :\n" + \
+            json.dumps(data)
+
     item = data["data"]["threaded_conversation_with_injections"]["instructions"][0]["entries"][0]["content"][
         "itemContent"]
 
