@@ -1,44 +1,67 @@
-import json
 import re
+import json
 import urllib.parse
 from .req import Request
 
 
-def get_guest_token(bearer_token: str) -> str:
-    url = "https://api.twitter.com/1.1/guest/activate.json"
-    response = Request.post(
-        url, headers={"Authorization": "Bearer " + bearer_token})
-    return json.loads(response.content.decode("utf-8"))["guest_token"]
+class GuestAccount:
+    def __init__(self, username: str, video_id: str):
+        self.username = username
+        self.video_id = video_id
+        self.__bearer_token, self.__graphql_query = self.__credentials()
+        self.__guest_token = self.__activate()
+
+    def __credentials(self) -> tuple:
+        video_url = "https://twitter.com/" + self.username + "/status/" + self.video_id
+        response = Request.get(video_url).content.decode("utf-8")
+        script_url = re.search(
+            r"https:\/\/abs.twimg.com\/responsive-web\/client-web-legacy\/main.[a-f0-9]+.js", response)[0]
+        script = Request.get(script_url).content.decode("utf-8")
+
+        bearer_token = re.search(r"\"([a-zA-Z0-9%]{104})\"", script)[1]
+        graphql_query_id = re.search(
+            r"{queryId:\"([a-zA-Z0-9\-_]+)\",operationName:\"TweetDetail\",operationType:\"query\"", script, re.M)[1]
+        return (bearer_token, graphql_query_id)
+
+    def __activate(self) -> str:
+        url = "https://api.twitter.com/1.1/guest/activate.json"
+        response = Request.post(
+            url, headers={"Authorization": "Bearer " + self.__bearer_token})
+        return json.loads(response.content.decode("utf-8"))["guest_token"]
+
+    @property
+    def bearer_token(self):
+        return self.__bearer_token
+
+    @property
+    def guest_token(self):
+        return self.__guest_token
+
+    @property
+    def graphql_query(self):
+        return self.__graphql_query
 
 
-def get_access_tokens(video_url) -> tuple:
-    response = Request.get(video_url).content.decode("utf-8")
-    script_url = re.search(
-        r"https:\/\/abs.twimg.com\/responsive-web\/client-web-legacy\/main.[a-f0-9]+.js", response)[0]
-    script = Request.get(script_url).content.decode("utf-8")
-    bearer_token = re.search(r"\"([a-zA-Z0-9%]{104})\"", script)[1]
-    graphql_query_id = re.search(
-        r"{queryId:\"([a-zA-Z0-9\-_]+)\",operationName:\"TweetDetail\",operationType:\"query\"", script, re.M)[1]
-    return (bearer_token, graphql_query_id)
+def get_video_as_json(video_id: str, guest_account: GuestAccount) -> dict:
+    variables = json.dumps(
+        {
+            "focalTweetId": video_id, "includePromotedContent": False, "withHighlightedLabel": False,
+            "withCommunity": False, "withTweetQuoteCount": False, "withBirdwatchNotes": False,
+            "withBirdwatchPivots": False, "withTweetResult": False, "withReactions": False,
+            "withSuperFollowsTweetFields": False, "withSuperFollowsUserFields": False,
+            "withUserResults": False, "withVoice": False, "withReactionsMetadata": False,
+            "withNftAvatar": False, "withReactionsPerspective": False, "withDownvotePerspective": False
+        }).replace(' ', '')
 
-
-def get_video_as_json(video_id: str, graphql_query: str, bearer_token: str, guest_token: str) -> dict:
-    variables = json.dumps({"focalTweetId": video_id, "includePromotedContent": False, "withHighlightedLabel": False,
-                            "withCommunity": False, "withTweetQuoteCount": False, "withBirdwatchNotes": False,
-                            "withBirdwatchPivots": False, "withTweetResult": False, "withReactions": False,
-                            "withSuperFollowsTweetFields": False, "withSuperFollowsUserFields": False, "withUserResults": False,
-                            "withVoice": False, "withReactionsMetadata": False, "withNftAvatar": False, "withReactionsPerspective": False, "withDownvotePerspective": False}).replace(' ', '')
-
-    url = "https://twitter.com/i/api/graphql/" + graphql_query + \
+    url = "https://twitter.com/i/api/graphql/" + guest_account.graphql_query + \
         "/TweetDetail?variables=" + urllib.parse.quote(variables)
     response = Request.get(url, headers={
-        "Authorization": "Bearer " + bearer_token,
-        "X-Guest-Token": guest_token,
+        "Authorization": "Bearer " + guest_account.bearer_token,
+        "X-Guest-Token": guest_account.guest_token,
     })
 
     content = response.content.decode("utf-8")
     data = json.loads(content)
-    print(data)
     item = data["data"]["threaded_conversation_with_injections"]["instructions"][0]["entries"][0]["content"][
         "itemContent"]
 
@@ -46,19 +69,14 @@ def get_video_as_json(video_id: str, graphql_query: str, bearer_token: str, gues
         legacy = item["tweet"]["legacy"]
     else:
         legacy = item["tweet_results"]["result"]["legacy"]
-    return legacy["extended_entities"]["media"] if "extended_entities" in legacy.keys() else None
+
+    if "extended_entities" in legacy.keys():
+        return legacy["extended_entities"]["media"]
 
 
 def get_video_sources(username: str, video_id: str) -> list:
-    video_url = "https://twitter.com/"+username+"/status/"+video_id
-
-    # Initializing tokens to use the API as a guest.
-    # Getting GraphQL Hash ID to perform 'TwitterDetails' request.
-    bearer, graphql_query = get_access_tokens(video_url)
-    guest_token = get_guest_token(bearer)
-
-    video_as_json = get_video_as_json(
-        video_id, graphql_query, bearer, guest_token)
+    guest_account = GuestAccount(username, video_id)
+    video_as_json = get_video_as_json(video_id, guest_account)
 
     if video_as_json is None:
         return []
